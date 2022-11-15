@@ -1,0 +1,241 @@
+---
+# Ansible playbook for OpenShift deployment on AWS for version 4.11
+# - hosts: all
+- name: Install openshift cluster
+  hosts: localhost
+  connection: local
+  become: yes
+  vars_prompt: 
+
+    - name: AWS_Access_Key_ID
+      prompt: What is your AWS Access Key ID?
+
+    - name: AWS_Secret_Access_Key
+      prompt: What is your AWS Secret Access Key?
+
+    - name: Pull_Secret
+      prompt: What is your Redhat account Pull Secret?
+
+    - name: AWS_Region
+      prompt: Which region to deploy cluster on?
+      private: no
+
+    - name: Base_Domain
+      prompt: What is your Base Domain name?
+      private: no
+
+    - name: Cluster_Name
+      prompt: What is your cluster name?
+      private: no
+
+
+  tasks:
+
+  - name: Install SSM agent fromo a remote repo per CyberSecurity Policy
+    tags: agent
+    yum: 
+      name: https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+      state: present
+
+
+  - name: Get status SSM Agent
+    command: systemctl status amazon-ssm-agent
+        
+  - shell: systemctl status amazon-ssm-agent
+    register: result
+
+  - debug:
+      var: result
+      verbosity: 2
+
+  - name: Update the OS with latest patches 
+    yum:
+      name: "*"
+      state: latest
+  
+  # - name: Reboot the machine (Wait for 1 min)
+  #   reboot:
+  #     reboot_timeout: 60ls
+
+  - name: Create openshift directory
+    file: 
+      path: openshift
+      state: directory
+
+  - name: Upload Openshift install file 
+    tags: upload
+    copy: 
+      src: openshift/openshift-install-linux.tar.gz
+      dest: openshift/openshift-install-linux.tar.gz
+
+  - name: Generate OpenSSH keypair used for cluster nodes
+    community.crypto.openssh_keypair:
+      path: /root/.ssh/openshift_key
+      type: ed25519
+      force: yes
+
+  - name: Start SSH agent and add SSH key to agent
+    shell: | 
+      eval "$(ssh-agent -s)"
+      ssh-add /root/.ssh/openshift_key
+
+  - name: Extract install file
+    command: chdir=openshift tar -xvf openshift-install-linux.tar.gz
+
+  - name: Create ocp-aws-install directory
+    file: 
+      path: openshift/ocp-aws-install
+      state: directory
+
+  # - name: Install pexpect
+  #   pip:
+  #     name: pexpect   
+
+  # - name: Run create cluster command with ocp install file
+  #   tags: install 
+  #   ansible.builtin.expect: 
+  #     chdir: openshift
+  #     command: ./openshift-install create cluster --dir ocp-aws-install --log-level=debug
+  #     echo: yes
+  #     timeout: 10
+  #     responses:
+  #       (.*)SSH(.*): "/root/.ssh/openshift_key.pub\r"
+  #       (.*)Platform(.*): "aws\r" 
+  #       (.*)Access Key ID(.*): "{{ AWS_Access_Key_ID }}\r"
+  #       (.*)AWS Secret Access Key(.*): "{{ AWS_Secret_Access_Key }}\r"
+  #       (.*)Region(.*): "{{ AWS_Region }}\r"
+  #       (.*)Base Domain(.*): "{{ Base_Domain }}\r"
+  #       (.*)Cluster Name(.*): "{{ Cluster_Name }}\r"
+  #       (.*)Pull Secret(.*): "{{ Pull_Secret }}\r"   
+
+  # ---------------- Test Section ------------------
+
+
+  # - name: Run create cluster command with ocp install file
+  #   ansible.builtin.expect: 
+  #     chdir: openshift
+  #     command: ./openshift-install create cluster --dir ocp-aws-install --log-level=debug
+  #     responses:
+  #       '(?i)(\W|^)(SSH)(\W|$)': /root/.ssh/openshift_key.pub
+  #       '(?i)(\W|^)(Platform)(\W|$)': aws 
+  #       '(?i)(\W|^)(Access\sKey\sID)(\W|$)': "{{ AWS_Access_Key_ID }}"
+  #       '(?i)(\W|^)(AWS\sSecret\sAccess\sKey)(\W|$)': "{{ AWS_Secret_Access_Key }}"
+  #       '(?i)(\W|^)(Region)(\W|$)': "{{ AWS_Region }}"
+  #       '(?i)(\W|^)(Base\sDomain)(\W|$)': "{{ Base_Domain }}"
+  #       '(?i)(\W|^)(Cluster\sName)(\W|$)': "{{ Cluster_Name }}"
+  #       '(?i)(\W|^)(Pull\sSecret)(\W|$)': "{{ Pull_Secret }}"
+          
+  # - name: Run create cluster command with ocp install file 
+  #   tags: install
+  #   shell:  
+  #     chdir: openshift
+  #     cmd:  |
+  #       set pull_secret {{ Pull_Secret }}
+  #       set pull_secret_formatted "{$pull_secret}"
+  #       set timeout 60
+  #       spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
+  #       exp_internal 1
+  #       expect -re {(.*)SSH Public Key(.*)}
+  #       send -- "/root/.ssh/openshift_key.pub\r"
+  #       expect -re {(.*)Platform(.*)}
+  #       send -- "aws\r"
+  #       expect -re {(.*)Region(.*)}
+  #       send -- "{{ AWS_Region }}\r"
+  #       expect -re {(.*)Base Domain(.*)}
+  #       send -- "{{ Base_Domain }}\r"
+  #       expect -re {(.*)Cluster Name(.*)}
+  #       send -- "{{ Cluster_Name }}\r"
+  #       expect -re {(.*)Pull Secret(.*)}
+  #       send -- $pull_secret_formatted
+  #       send -- "\r"
+  #       expect eof
+  #       exit 0
+  #     executable: /usr/bin/expect  
+# try manually placing aws key into aws credentials file to skip prompt
+# see what happens after pull_secret 
+
+# also try manually placing red hat pull secret into oc credentials file  
+# see if you still need to input pull secret after doing this
+
+#  expect -re {(.*)AWS Access Key ID(.*)}
+#         send -- "{{ AWS_Access_Key_ID }}\r"
+#         expect -re {(.*)AWS Secret Access Key(.*)}
+#         send -- "{{ AWS_Secret_Access_Key }}\r"
+    
+# - name: Run create cluster command with ocp install file 
+#     tags: install
+#     shell:  
+#       chdir: openshift
+#       cmd:  |
+#         set timeout 10
+#         spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
+#         expect -re "(.*)SSH Public Key(.*)"
+#         send -- "/root/.ssh/openshift_key.pub\r"
+#         expect -re "(.*)Platform(.*)"
+#         send -- "aws\r"
+#         expect -re "(.*)AWS Access Key ID(.*)"
+#         send -- "{{ AWS_Access_Key_ID }}\r"
+#         interact
+#         expect -re "(.*)AWS Secret Access Key(.*)"
+#         send -- "{{ AWS_Secret_Access_Key }}\r"
+#         expect -re "(.*)Region(.*)"
+#         send -- "{{ AWS_Region }}\r"
+#         expect -re "(.*)Base Domain(.*)"
+#         send -- "{{ Base_Domain }}\r"
+#         expect -re "(.*)Cluster Name(.*)"
+#         send -- "{{ Cluster_Name }}\r"
+#         expect -re "(.*)Pull Secret(.*)"
+#         send -- "{{ Pull_Secret }}\r"
+#       executable: /usr/bin/expect  
+
+# -------------- Semi Working Versions ------------------
+
+ # make sure aws credentials file dne or configure aws and update lines bellow
+
+  # make sure --log-level is error to avoid extra stdout lines 
+
+  # sudo yum install expect for bottom task to run
+
+  # use exp_internal 1 for info to appear in stderr
+
+  # ?? use tcl variables (set var_name var_value)
+  #     try the regex method  
+
+  - name: Run create cluster command with ocp install file 
+    tags: install
+    shell:  
+      chdir: openshift
+      cmd:  |
+        set pull_secret {{ Pull_Secret }}
+        set pull_secret_formatted "{$pull_secret}"
+        set timeout 10
+        match_max 100000
+        spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
+        exp_internal 1
+        expect -re {(.*)SSH Public Key(.*)}
+        send -- "/root/.ssh/openshift_key.pub\r"
+        expect -re {(.*)Platform(.*)}
+        send -- "aws\r"
+        expect -re {(.*)AWS Access Key ID(.*)}
+        send -- "{{ AWS_Access_Key_ID }}\r"
+        expect -re {(.*)AWS Secret Access Key(.*)}
+        send -- "r0JyuXjikA+c0RAzlEIn0GaRPl7mCr4n8xOuDWbI"
+        expect -re {(.*)(.*)}
+        send -- "\r"
+        expect -re {(.*)Region(.*)}
+        send -- "{{ AWS_Region }}\r"
+        expect -re {(.*)Base Domain(.*)}
+        send -- "{{ Base_Domain }}\r"
+        expect -re {(.*)Cluster Name(.*)}
+        send -- "{{ Cluster_Name }}\r"
+        expect -re {(.*)Pull Secret(.*)}
+        send -- $pull_secret_formatted
+        send -- "\r"
+        expect eof
+        exit 0
+      executable: /usr/bin/expect  
+
+
+
+
+
