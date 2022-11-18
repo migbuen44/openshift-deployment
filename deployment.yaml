@@ -91,40 +91,36 @@
   #   pip:
   #     name: pexpect   
 
-  # - name: Run create cluster command with ocp install file
-  #   tags: install 
-  #   ansible.builtin.expect: 
-  #     chdir: openshift
-  #     command: ./openshift-install create cluster --dir ocp-aws-install --log-level=debug
-  #     echo: yes
-  #     timeout: 10
-  #     responses:
-  #       (.*)SSH(.*): "/root/.ssh/openshift_key.pub\r"
-  #       (.*)Platform(.*): "aws\r" 
-  #       (.*)Access Key ID(.*): "{{ AWS_Access_Key_ID }}\r"
-  #       (.*)AWS Secret Access Key(.*): "{{ AWS_Secret_Access_Key }}\r"
-  #       (.*)Region(.*): "{{ AWS_Region }}\r"
-  #       (.*)Base Domain(.*): "{{ Base_Domain }}\r"
-  #       (.*)Cluster Name(.*): "{{ Cluster_Name }}\r"
-  #       (.*)Pull Secret(.*): "{{ Pull_Secret }}\r"   
+  - name: Run create cluster command with ocp install file
+    tags: install 
+    ansible.builtin.expect: 
+      chdir: openshift
+      command: ./openshift-install create cluster --dir ocp-aws-install --log-level=debug
+      echo: yes
+      timeout: 10
+      responses:
+        (.*)SSH(.*): "/root/.ssh/openshift_key.pub\r"
+        (.*)Platform(.*): "aws\r" 
+        (.*)Access Key ID(.*): "{{ AWS_Access_Key_ID }}\r"
+        (.*)AWS Secret Access Key(.*): "{{ AWS_Secret_Access_Key }}\r"
+        (.*)Region(.*): "{{ AWS_Region }}\r"
+        (.*)Base Domain(.*): "{{ Base_Domain }}\r"
+        (.*)Cluster Name(.*): "{{ Cluster_Name }}\r"
+        (.*)Pull Secret(.*): "{{ Pull_Secret }}\r"   
 
   # ---------------- Test Section ------------------
 
+  # make sure aws credentials file dne or configure aws and update lines bellow
 
-  # - name: Run create cluster command with ocp install file
-  #   ansible.builtin.expect: 
-  #     chdir: openshift
-  #     command: ./openshift-install create cluster --dir ocp-aws-install --log-level=debug
-  #     responses:
-  #       '(?i)(\W|^)(SSH)(\W|$)': /root/.ssh/openshift_key.pub
-  #       '(?i)(\W|^)(Platform)(\W|$)': aws 
-  #       '(?i)(\W|^)(Access\sKey\sID)(\W|$)': "{{ AWS_Access_Key_ID }}"
-  #       '(?i)(\W|^)(AWS\sSecret\sAccess\sKey)(\W|$)': "{{ AWS_Secret_Access_Key }}"
-  #       '(?i)(\W|^)(Region)(\W|$)': "{{ AWS_Region }}"
-  #       '(?i)(\W|^)(Base\sDomain)(\W|$)': "{{ Base_Domain }}"
-  #       '(?i)(\W|^)(Cluster\sName)(\W|$)': "{{ Cluster_Name }}"
-  #       '(?i)(\W|^)(Pull\sSecret)(\W|$)': "{{ Pull_Secret }}"
-          
+  # make sure --log-level is error to avoid extra stdout lines 
+
+  # sudo yum install expect for bottom task to run
+
+  # use exp_internal 1 for info to appear in stderr
+
+  # ?? use tcl variables (set var_name var_value)
+  #     try the regex method  
+
   # - name: Run create cluster command with ocp install file 
   #   tags: install
   #   shell:  
@@ -132,13 +128,20 @@
   #     cmd:  |
   #       set pull_secret {{ Pull_Secret }}
   #       set pull_secret_formatted "{$pull_secret}"
-  #       set timeout 60
+  #       set timeout 10
+  #       match_max 100000
   #       spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
   #       exp_internal 1
   #       expect -re {(.*)SSH Public Key(.*)}
   #       send -- "/root/.ssh/openshift_key.pub\r"
   #       expect -re {(.*)Platform(.*)}
   #       send -- "aws\r"
+  #       expect -re {(.*)AWS Access Key ID(.*)}
+  #       send -- "{{ AWS_Access_Key_ID }}\r"
+  #       expect -re {(.*)AWS Secret Access Key(.*)}
+  #       send -- "r0JyuXjikA+c0RAzlEIn0GaRPl7mCr4n8xOuDWbI"
+  #       expect -re {(.*)(.*)}
+  #       send -- "\r"
   #       expect -re {(.*)Region(.*)}
   #       send -- "{{ AWS_Region }}\r"
   #       expect -re {(.*)Base Domain(.*)}
@@ -151,89 +154,6 @@
   #       expect eof
   #       exit 0
   #     executable: /usr/bin/expect  
-# try manually placing aws key into aws credentials file to skip prompt
-# see what happens after pull_secret 
-
-# also try manually placing red hat pull secret into oc credentials file  
-# see if you still need to input pull secret after doing this
-
-#  expect -re {(.*)AWS Access Key ID(.*)}
-#         send -- "{{ AWS_Access_Key_ID }}\r"
-#         expect -re {(.*)AWS Secret Access Key(.*)}
-#         send -- "{{ AWS_Secret_Access_Key }}\r"
-    
-# - name: Run create cluster command with ocp install file 
-#     tags: install
-#     shell:  
-#       chdir: openshift
-#       cmd:  |
-#         set timeout 10
-#         spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
-#         expect -re "(.*)SSH Public Key(.*)"
-#         send -- "/root/.ssh/openshift_key.pub\r"
-#         expect -re "(.*)Platform(.*)"
-#         send -- "aws\r"
-#         expect -re "(.*)AWS Access Key ID(.*)"
-#         send -- "{{ AWS_Access_Key_ID }}\r"
-#         interact
-#         expect -re "(.*)AWS Secret Access Key(.*)"
-#         send -- "{{ AWS_Secret_Access_Key }}\r"
-#         expect -re "(.*)Region(.*)"
-#         send -- "{{ AWS_Region }}\r"
-#         expect -re "(.*)Base Domain(.*)"
-#         send -- "{{ Base_Domain }}\r"
-#         expect -re "(.*)Cluster Name(.*)"
-#         send -- "{{ Cluster_Name }}\r"
-#         expect -re "(.*)Pull Secret(.*)"
-#         send -- "{{ Pull_Secret }}\r"
-#       executable: /usr/bin/expect  
-
-# -------------- Semi Working Versions ------------------
-
- # make sure aws credentials file dne or configure aws and update lines bellow
-
-  # make sure --log-level is error to avoid extra stdout lines 
-
-  # sudo yum install expect for bottom task to run
-
-  # use exp_internal 1 for info to appear in stderr
-
-  # ?? use tcl variables (set var_name var_value)
-  #     try the regex method  
-
-  - name: Run create cluster command with ocp install file 
-    tags: install
-    shell:  
-      chdir: openshift
-      cmd:  |
-        set pull_secret {{ Pull_Secret }}
-        set pull_secret_formatted "{$pull_secret}"
-        set timeout 10
-        match_max 100000
-        spawn ./openshift-install create cluster --dir ocp-aws-install --log-level=info
-        exp_internal 1
-        expect -re {(.*)SSH Public Key(.*)}
-        send -- "/root/.ssh/openshift_key.pub\r"
-        expect -re {(.*)Platform(.*)}
-        send -- "aws\r"
-        expect -re {(.*)AWS Access Key ID(.*)}
-        send -- "{{ AWS_Access_Key_ID }}\r"
-        expect -re {(.*)AWS Secret Access Key(.*)}
-        send -- "r0JyuXjikA+c0RAzlEIn0GaRPl7mCr4n8xOuDWbI"
-        expect -re {(.*)(.*)}
-        send -- "\r"
-        expect -re {(.*)Region(.*)}
-        send -- "{{ AWS_Region }}\r"
-        expect -re {(.*)Base Domain(.*)}
-        send -- "{{ Base_Domain }}\r"
-        expect -re {(.*)Cluster Name(.*)}
-        send -- "{{ Cluster_Name }}\r"
-        expect -re {(.*)Pull Secret(.*)}
-        send -- $pull_secret_formatted
-        send -- "\r"
-        expect eof
-        exit 0
-      executable: /usr/bin/expect  
 
 
 
